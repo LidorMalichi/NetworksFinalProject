@@ -4,7 +4,7 @@ from Quic import QUICProtocol
 from Events import *
 
 
-def run_server(host='127.0.0.1', port=1234):
+def run_server(host='127.0.0.1', port=4433):
     server = QUICProtocol(is_client=False)
     server.bind(host, port)
     print(f"Server listening on {host}:{port}")
@@ -15,8 +15,9 @@ def run_server(host='127.0.0.1', port=1234):
     with open('toSend.txt', 'rb') as file:
         file_data = file.read()
 
-    # Create a dictionary to track the remaining data to send for each stream
+    # Create dictionaries to track the remaining data and chunk size for each stream
     remaining_data_per_stream = {}
+    chunk_size_per_stream = {}
     streams_remaining = set()
 
     while True:
@@ -28,12 +29,11 @@ def run_server(host='127.0.0.1', port=1234):
                 num_streams = event.num_streams
                 print(f"Preparing to send {num_streams} streams to client.")
 
-                # Sample a chunk size uniformly at random for this entire connection
-                chunk_size = random.randint(1000, 2000)
-                print(f"Using chunk size: {chunk_size}")
-
-                # Create a dictionary to track the remaining data to send for each stream
-                remaining_data_per_stream = {stream_id: file_data[:] for stream_id in range(1, num_streams + 1)}
+                # Initialize dictionaries for each stream
+                for stream_id in range(1, num_streams + 1):
+                    remaining_data_per_stream[stream_id] = file_data[:]
+                    chunk_size_per_stream[stream_id] = random.randint(1000, 2000)
+                    print(f"Stream {stream_id} using chunk size: {chunk_size_per_stream[stream_id]}")
 
                 # Continue sending data until all streams are done
                 streams_remaining = set(range(1, num_streams + 1))
@@ -43,6 +43,9 @@ def run_server(host='127.0.0.1', port=1234):
                     data_chunk = remaining_data_per_stream[stream_id]
 
                     if data_chunk:
+                        # Use the pre-sampled chunk size for this stream
+                        chunk_size = chunk_size_per_stream[stream_id]
+
                         chunk = data_chunk[:chunk_size]
                         remaining_data_per_stream[stream_id] = data_chunk[chunk_size:]
 

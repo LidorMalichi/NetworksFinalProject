@@ -4,7 +4,7 @@ import time
 
 
 #
-def run_client(host='127.0.0.1', port=1234):
+def run_client(host='127.0.0.1', port=4433):
     num_streams = int(input("Enter the number of streams: "))
 
     client = QUICProtocol(is_client=True)
