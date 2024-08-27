@@ -38,7 +38,7 @@ class QuicStreamReceiver:
             end_of_stream=end_of_stream
         )
 
-        # Return the event (you can also trigger an event handler here if needed)
+        # Return the event
         return event
 
 

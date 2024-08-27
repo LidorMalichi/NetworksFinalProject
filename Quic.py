@@ -6,8 +6,8 @@ from QuicStream import *
 from queue import Queue
 from Events import *
 
-class QUICProtocol:
 
+class QUICProtocol:
     STREAM_REQUEST_FLAG = 0b000001
     STREAM_DATA_FLAG = 0b000010
     ACK_FLAG = 0b000100
@@ -22,20 +22,16 @@ class QUICProtocol:
         self.connection_id = None  # Connection ID to be set upon connection
         self.stream_frame_queue = Queue()
         self.streams = {}  # Tracks streams by their ID
-        self.events = Queue() # Queue for stream data recieved events
+        self.events = Queue()  # Queue for stream data recieved events
         self.packet_number = 0  # Initialize packet number
-        self.packets_to_ack = {} # Packets to ack
+        self.packets_to_ack = {}  # Packets to ack
         self.fin_streams = set()  # Tracks streams that have finished sending
-
-
 
     def bind(self, host: str, port: int):
         """Bind the socket to a specific address and port if acting as a server."""
         if self.is_client:
             raise ValueError("Clients cannot bind to a specific address and port.")
         self.socket.bind((host, port))
-
-
 
     def connect(self, host: str, port: int):
         """Set the address for the server if acting as a client and store the connection ID."""
@@ -67,13 +63,11 @@ class QUICProtocol:
         else:
             print("Failed to establish connection: unexpected response.")
 
-
-
     def accept_connection(self):
         """Accept a connection request and send a connection ID to the client."""
         data, addr = self.socket.recvfrom(65535)
         packet = QUICPacket.deserialize(data)
-        
+
         if packet.flags == self.START_CONNECTION_FLAG:
 
             self.connection_id = random.randint(1, 1 << 32)
@@ -82,8 +76,8 @@ class QUICProtocol:
 
             # Send a start connection packet with the connection ID
             start_packet = QUICPacket(
-                flags=self.START_CONNECTION_FLAG, 
-                connection_id=self.connection_id, 
+                flags=self.START_CONNECTION_FLAG,
+                connection_id=self.connection_id,
                 packet_number=self.packet_number + 1,
                 frames=[]
             )
@@ -102,29 +96,27 @@ class QUICProtocol:
         else:
             print("Received unexpected packet during connection process.")
 
-
     def send_stream_request(self, num_streams: int):
         """Client sends a request to the server for the desired number of streams/files."""
         request_packet = QUICPacket(
             flags=self.STREAM_REQUEST_FLAG,
             connection_id=self.connection_id,
             packet_number=self.packet_number,
-            frames=[StreamFrame(stream_id=0, offset=0, length=4, stream_data=num_streams.to_bytes(4, 'big'), flags=StreamFrame.FIN_DATA_FRAME)]
+            frames=[StreamFrame(stream_id=0, offset=0, length=4, stream_data=num_streams.to_bytes(4, 'big'),
+                                flags=StreamFrame.FIN_DATA_FRAME)]
         )
         self.packet_number += 1
         self.socket.sendto(request_packet.serialize(), self.address)
         print(f"Requested {num_streams} streams/files from the server.")
 
-
     def handle_stream_request(self, packet: QUICPacket):
         """Server handles the client's stream/file request."""
-        
+
         stream_frame = packet.frames[0]
         num_streams = int.from_bytes(stream_frame.stream_data, 'big')
         print(f"Received request for {num_streams} streams/files from the client.")
-           
-        self.events.put(StreamRequestEvent(num_streams))
 
+        self.events.put(StreamRequestEvent(num_streams))
 
     def send_stream_data(self, stream_id: int, data: bytes, end_of_stream: bool):
         """Creates a StreamFrame and adds it to the queue of streamframes to send."""
@@ -143,8 +135,6 @@ class QUICProtocol:
             stream.close()
             self.fin_streams.add(stream_id)
 
-
-
     def send_datagram(self):
         """Send all frames in the queue."""
         frames = []
@@ -155,9 +145,9 @@ class QUICProtocol:
             # Increment the packet number for each packet sent
             self.packet_number += 1
             packet = QUICPacket(
-                flags=self.STREAM_DATA_FLAG, 
-                connection_id=self.connection_id, 
-                packet_number=self.packet_number, 
+                flags=self.STREAM_DATA_FLAG,
+                connection_id=self.connection_id,
+                packet_number=self.packet_number,
                 frames=frames
             )
             try:
@@ -165,8 +155,6 @@ class QUICProtocol:
                 self.packets_to_ack[self.packet_number] = packet
             except socket.error as e:
                 print(f"Socket error: {e}")
-
-
 
     def send_ack(self, packet_number: int):
         """Send an acknowledgment packet for the received packet."""
@@ -177,7 +165,6 @@ class QUICProtocol:
             frames=[]
         )
         self.socket.sendto(ack_packet.serialize(), self.address)
-
 
     def send(self, stream_id: int, data: bytes, end_of_stream: bool):
         """Encapsulates send_stream_data and send_datagram."""
@@ -195,11 +182,9 @@ class QUICProtocol:
         # If the number of frames is 60% of the number of not closed streams, send the datagram
         if self.stream_frame_queue.qsize() >= threshold:
             self.send_datagram()
-            
+
             # Wait for ack on the packet
             self.recv()
-
-
 
     def recv_stream_data(self, frame: StreamFrame):
         """Process the received stream data and handle end-of-stream."""
@@ -215,9 +200,6 @@ class QUICProtocol:
             print(f"Stream {event.stream_id} has received the end of data.")
             stream.close()
             self.fin_streams.add(event.stream_id)
-
-
-
 
     def recv_datagram(self):
         """Receive a datagram and deserialize it."""
@@ -242,8 +224,6 @@ class QUICProtocol:
         except Exception as e:
             print(f"Error in recv_datagram: {e}")
             return None
-        
-
 
     def recv(self):
         """Encapsulates recv_datagram and recv_stream_data."""
@@ -271,8 +251,6 @@ class QUICProtocol:
                 else:
                     print(f"Cannot recieve data: Stream {frame.stream_id} is already closed.")
         self.send_ack(packet.packet_number)
-                
-
 
     def close(self):
         """Sends a FIN packet to close the stream or connection."""
@@ -301,11 +279,10 @@ class QUICProtocol:
             self.socket.sendto(ack_packet.serialize(), self.address)
             print(f"Sent ACK for FIN_ACK. Connection closed.")
 
-
     def recv_fin(self):
         """Handles a FIN packet and sends a FIN_ACK."""
         print(f"Received FIN for connection {self.connection_id}.")
-    
+
         # Send FIN_ACK to acknowledge the FIN
         fin_ack_packet = QUICPacket(
             flags=self.FIN_ACK_FLAG,

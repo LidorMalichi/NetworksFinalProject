@@ -6,7 +6,7 @@ class QUICPacket:
         self.flags = flags
         self.connection_id = connection_id
         self.packet_number = packet_number
-        self.frames = frames  # This will hold instances of StreamFrame
+        self.frames = frames  # This will hold an instances of StreamFrame
 
     def serialize(self):
         header = struct.pack('!BQI', self.flags, self.connection_id, self.packet_number)
